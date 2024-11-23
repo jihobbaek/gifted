@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인공지능 테스트</title>
+    <style>
+        /* General Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Body styling */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #4e73df, #1c2b5f);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        /* Title Styling */
+        h1 {
+            font-size: 2.5rem;
+            color: #fff;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        /* Button Styling */
+        .button-container {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #6c63ff;
+            color: white;
+            padding: 15px 40px;
+            font-size: 18px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        button:hover {
+            background-color: #5b50e0;
+            transform: translateY(-3px);
+        }
+        button:active {
+            background-color: #4f46d4;
+            transform: translateY(1px);
+        }
+
+        /* Webcam Container */
+        #webcam-container {
+            margin-top: 40px;
+            border-radius: 15px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+            max-width: 100%;
+        }
+
+        /* Label Container Styling */
+        #label-container {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .label {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            padding: 12px 20px;
+            margin: 12px 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            font-size: 18px;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        .label:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: translateX(10px);
+        }
+        .label span {
+            font-weight: bold;
+            color: #6c63ff;
+        }
+
+        /* Result Styling */
+        #result {
+            font-size: 2rem;
+            margin-top: 30px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>바른 자세 판별기</h1>
+    <div class="button-container">
+        <button type="button" onclick="init()">Start</button>
+    </div>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+    <div id="result"></div> <!-- Add the result display here -->
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+        // the link to your model provided by Teachable Machine export panel
+        const URL = "https://teachablemachine.withgoogle.com/models/mKFbHBR1k/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        // Load the image model and setup the webcam
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // load the model and metadata
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Setup webcam
+            const flip = true; // whether to flip the webcam
+            webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+            await webcam.setup(); // request access to the webcam
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            // append elements to the DOM
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                const labelElement = document.createElement("div");
+                labelElement.classList.add('label');
+                labelContainer.appendChild(labelElement);
+            }
+        }
+
+        async function loop() {
+            webcam.update(); // update the webcam frame
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // run the webcam image through the image model
+        async function predict() {
+            // predict can take in an image, video or canvas HTML element
+            const prediction = await model.predict(webcam.canvas);
+            let classPrediction1 = prediction[0].probability * 100; // 클래스 1 확률을 퍼센트로 변환
+            let classPrediction2 = prediction[1].probability * 100; // 클래스 2 확률을 퍼센트로 변환
+
+            // Display the class predictions in the label container
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = 
+                    prediction[i].className + ": <span>" + (prediction[i].probability * 100).toFixed(2) + "%</span>";
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+
+            // Compare the probabilities of class 1 and class 2
+            if (classPrediction1 > classPrediction2) {
+                document.getElementById("result").innerHTML = "바른 자세: " + classPrediction1.toFixed(2) + "%";
+            } else {
+                document.getElementById("result").innerHTML = "바르지 않은 자세: " + classPrediction2.toFixed(2) + "%";
+            }
+        }
+    </script>
+</body>
+</html>
